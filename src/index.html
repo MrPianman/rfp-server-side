@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WebSocket Logger</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      padding: 20px;
+    }
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+      overflow: hidden;
+    }
+    .header {
+      background: #2d3748;
+      color: white;
+      padding: 20px 30px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .status {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .status-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: #48bb78;
+      animation: pulse 2s infinite;
+    }
+    .status-dot.disconnected {
+      background: #f56565;
+      animation: none;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+    .content {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      padding: 30px;
+    }
+    .panel {
+      background: #f7fafc;
+      border-radius: 8px;
+      padding: 20px;
+    }
+    .panel h2 {
+      color: #2d3748;
+      margin-bottom: 15px;
+      font-size: 18px;
+    }
+    #logs {
+      background: #1a202c;
+      color: #a0aec0;
+      padding: 15px;
+      border-radius: 6px;
+      height: 400px;
+      overflow-y: auto;
+      font-family: 'Courier New', monospace;
+      font-size: 13px;
+      line-height: 1.6;
+    }
+    .log-entry {
+      margin-bottom: 8px;
+      padding: 8px;
+      border-radius: 4px;
+      background: rgba(255,255,255,0.05);
+    }
+    .log-time {
+      color: #68d391;
+      margin-right: 10px;
+    }
+    .log-received {
+      color: #63b3ed;
+    }
+    .log-sent {
+      color: #f6ad55;
+    }
+    .log-server {
+      color: #f6ad55;
+      font-weight: bold;
+    }
+    .log-system {
+      color: #9f7aea;
+    }
+    .input-group {
+      display: flex;
+      gap: 10px;
+      margin-top: 15px;
+    }
+    input[type="text"] {
+      flex: 1;
+      padding: 12px;
+      border: 2px solid #e2e8f0;
+      border-radius: 6px;
+      font-size: 14px;
+      transition: border-color 0.2s;
+    }
+    input[type="text"]:focus {
+      outline: none;
+      border-color: #667eea;
+    }
+    button {
+      padding: 12px 24px;
+      background: #667eea;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 600;
+      transition: background 0.2s;
+    }
+    button:hover {
+      background: #5568d3;
+    }
+    button:active {
+      transform: scale(0.98);
+    }
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin-top: 15px;
+    }
+    .stat-box {
+      background: white;
+      padding: 15px;
+      border-radius: 6px;
+      text-align: center;
+    }
+    .stat-value {
+      font-size: 24px;
+      font-weight: bold;
+      color: #667eea;
+    }
+    .stat-label {
+      font-size: 12px;
+      color: #718096;
+      margin-top: 5px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>🦊 WebSocket Logger</h1>
+      <div class="status">
+        <div class="status-dot" id="statusDot"></div>
+        <span id="statusText">Connecting...</span>
+      </div>
+    </div>
+    <div class="content">
+      <div class="panel">
+        <h2>📋 Message Logs</h2>
+        <div id="logs"></div>
+      </div>
+      <div class="panel">
+        <h2>📤 Send Message</h2>
+        <div class="input-group">
+          <input type="text" id="messageInput" placeholder="Type your message..." />
+          <button onclick="sendMessage()">Send</button>
+        </div>
+        <div class="stats">
+          <div class="stat-box">
+            <div class="stat-value" id="sentCount">0</div>
+            <div class="stat-label">Sent</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-value" id="receivedCount">0</div>
+            <div class="stat-label">Received</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-value" id="totalCount">0</div>
+            <div class="stat-label">Total</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let ws;
+    let sentCount = 0;
+    let receivedCount = 0;
+
+    function connect() {
+      ws = new WebSocket(`ws://${window.location.host}/ws`);
+
+      ws.onopen = () => {
+        addLog('System: Connected to server', 'system');
+        updateStatus(true);
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          if (data.type === 'server') {
+            addLog('Server: ' + data.message, 'server');
+          } else if (data.type === 'client') {
+            addLog('Client: ' + data.message, 'received');
+            receivedCount++;
+            updateStats();
+          } else if (data.type === 'system') {
+            addLog('System: ' + data.message, 'system');
+          }
+        } catch (e) {
+          addLog('Received: ' + event.data, 'received');
+          receivedCount++;
+          updateStats();
+        }
+      };
+
+      ws.onclose = () => {
+        addLog('System: Disconnected from server', 'system');
+        updateStatus(false);
+        setTimeout(connect, 3000);
+      };
+
+      ws.onerror = (error) => {
+        addLog('System: Connection error', 'system');
+      };
+    }
+
+    function sendMessage() {
+      const input = document.getElementById('messageInput');
+      const message = input.value.trim();
+      
+      if (message && ws && ws.readyState === WebSocket.OPEN) {
+        // Send as server message
+        const serverMessage = JSON.stringify({
+          type: 'server',
+          message: message
+        });
+        ws.send(serverMessage);
+        addLog('Server: ' + message, 'server');
+        sentCount++;
+        updateStats();
+        input.value = '';
+      }
+    }
+
+    function addLog(message, type) {
+      const logsDiv = document.getElementById('logs');
+      const entry = document.createElement('div');
+      entry.className = 'log-entry';
+      
+      const time = new Date().toLocaleTimeString();
+      entry.innerHTML = `<span class="log-time">[${time}]</span><span class="log-${type}">${message}</span>`;
+      
+      logsDiv.appendChild(entry);
+      logsDiv.scrollTop = logsDiv.scrollHeight;
+    }
+
+    function updateStatus(connected) {
+      const dot = document.getElementById('statusDot');
+      const text = document.getElementById('statusText');
+      
+      if (connected) {
+        dot.classList.remove('disconnected');
+        text.textContent = 'Connected';
+      } else {
+        dot.classList.add('disconnected');
+        text.textContent = 'Disconnected';
+      }
+    }
+
+    function updateStats() {
+      document.getElementById('sentCount').textContent = sentCount;
+      document.getElementById('receivedCount').textContent = receivedCount;
+      document.getElementById('totalCount').textContent = sentCount + receivedCount;
+    }
+
+    document.getElementById('messageInput').addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') sendMessage();
+    });
+
+    connect();
+  </script>
+</body>
+</html>
