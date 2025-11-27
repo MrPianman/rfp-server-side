@@ -54,6 +54,11 @@
       gap: 20px;
       padding: 30px;
     }
+    @media (max-width: 1024px) {
+      .content {
+        grid-template-columns: 1fr;
+      }
+    }
     .panel {
       background: #f7fafc;
       border-radius: 8px;
@@ -153,6 +158,53 @@
       color: #718096;
       margin-top: 5px;
     }
+    .db-section {
+      grid-column: 1 / -1;
+    }
+    .table-selector {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 15px;
+    }
+    select {
+      flex: 1;
+      padding: 10px;
+      border: 2px solid #e2e8f0;
+      border-radius: 6px;
+      font-size: 14px;
+      background: white;
+    }
+    .table-container {
+      overflow-x: auto;
+      background: white;
+      border-radius: 6px;
+      max-height: 400px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    th, td {
+      padding: 12px;
+      text-align: left;
+      border-bottom: 1px solid #e2e8f0;
+    }
+    th {
+      background: #667eea;
+      color: white;
+      font-weight: 600;
+      position: sticky;
+      top: 0;
+    }
+    tr:hover {
+      background: #f7fafc;
+    }
+    .empty-state {
+      text-align: center;
+      padding: 40px;
+      color: #718096;
+    }
   </style>
 </head>
 <body>
@@ -188,6 +240,20 @@
             <div class="stat-value" id="totalCount">0</div>
             <div class="stat-label">Total</div>
           </div>
+        </div>
+      </div>
+    </div>
+    <div class="content">
+      <div class="panel db-section">
+        <h2>🗄️ Database Content</h2>
+        <div class="table-selector">
+          <select id="tableSelect" onchange="loadTable()">
+            <option value="">Select a table...</option>
+          </select>
+          <button onclick="loadTable()">Refresh</button>
+        </div>
+        <div class="table-container" id="tableContainer">
+          <div class="empty-state">Select a table to view its contents</div>
         </div>
       </div>
     </div>
@@ -290,6 +356,76 @@
     });
 
     connect();
+
+    // Database functions
+    async function loadTables() {
+      try {
+        const response = await fetch('/api/tables');
+        const tables = await response.json();
+        const select = document.getElementById('tableSelect');
+        
+        tables.forEach(table => {
+          const option = document.createElement('option');
+          option.value = table.name;
+          option.textContent = table.name;
+          select.appendChild(option);
+        });
+      } catch (error) {
+        console.error('Error loading tables:', error);
+      }
+    }
+
+    async function loadTable() {
+      const select = document.getElementById('tableSelect');
+      const tableName = select.value;
+      
+      if (!tableName) {
+        document.getElementById('tableContainer').innerHTML = '<div class="empty-state">Select a table to view its contents</div>';
+        return;
+      }
+
+      try {
+        const response = await fetch(`/api/table/${tableName}`);
+        const result = await response.json();
+        
+        if (result.error) {
+          document.getElementById('tableContainer').innerHTML = `<div class="empty-state">Error: ${result.error}</div>`;
+          return;
+        }
+
+        const { schema, data } = result;
+        
+        if (data.length === 0) {
+          document.getElementById('tableContainer').innerHTML = '<div class="empty-state">No data in this table</div>';
+          return;
+        }
+
+        // Create table HTML
+        let html = '<table><thead><tr>';
+        schema.forEach(col => {
+          html += `<th>${col.name}</th>`;
+        });
+        html += '</tr></thead><tbody>';
+
+        data.forEach(row => {
+          html += '<tr>';
+          schema.forEach(col => {
+            const value = row[col.name];
+            html += `<td>${value !== null ? value : '<i>null</i>'}</td>`;
+          });
+          html += '</tr>';
+        });
+
+        html += '</tbody></table>';
+        document.getElementById('tableContainer').innerHTML = html;
+      } catch (error) {
+        console.error('Error loading table data:', error);
+        document.getElementById('tableContainer').innerHTML = '<div class="empty-state">Error loading data</div>';
+      }
+    }
+
+    // Load tables on page load
+    loadTables();
   </script>
 </body>
 </html>
