@@ -1,63 +1,133 @@
-import { Elysia } from "elysia";
-import { Database } from "bun:sqlite";
-import path from "path";
+import { Elysia, t } from "elysia";
+import { convertDistanceTextToKm, type TravelMode } from "./lib/distance";
 
-const dbPath = path.join(process.cwd(), "DataBase", "db.sqlite");
-const db = new Database(dbPath);
+const travelModes: TravelMode[] = ["driving", "walking", "bicycling", "transit"];
+
+class HttpError extends Error {
+	status: number;
+
+	constructor(message: string, status: number) {
+		super(message);
+		this.name = "HttpError";
+		this.status = status;
+	}
+}
+
+type DirectionsResponse = {
+	status?: string;
+	error_message?: string;
+	routes?: Array<{
+		legs?: Array<{
+			distance?: { text?: string };
+		}>;
+	}>;
+};
+
+const fetchDistanceInKm = async (
+	originInput: string,
+	destinationInput: string,
+	mode: TravelMode,
+) => {
+	const origin = originInput.trim();
+	const destination = destinationInput.trim();
+
+	if (!origin) {
+		throw new HttpError("origin query parameter is required", 400);
+	}
+
+	if (!destination) {
+		throw new HttpError("destination query parameter is required", 400);
+	}
+
+	const apiKey = Bun.env.GOOGLE_MAPS_API_KEY ?? process.env.GOOGLE_MAPS_API_KEY;
+	if (!apiKey) {
+		throw new HttpError("Missing GOOGLE_MAPS_API_KEY environment variable", 500);
+	}
+
+	const directionsUrl = new URL("https://maps.googleapis.com/maps/api/directions/json");
+	directionsUrl.searchParams.set("origin", origin);
+	directionsUrl.searchParams.set("destination", destination);
+	directionsUrl.searchParams.set("mode", mode);
+	directionsUrl.searchParams.set("key", apiKey);
+
+	const response = await fetch(directionsUrl);
+	if (!response.ok) {
+		throw new HttpError(
+			`Google Directions request failed with status ${response.status}`,
+			502,
+		);
+	}
+
+	const payload: DirectionsResponse = await response.json();
+	if (payload.status && payload.status !== "OK") {
+		const statusCode = payload.status === "ZERO_RESULTS" ? 404 : 502;
+		const details = payload.error_message ?? payload.status;
+		throw new HttpError(`Google Directions error: ${details}`, statusCode);
+	}
+
+	const distanceText = payload.routes?.[0]?.legs?.[0]?.distance?.text;
+	if (!distanceText) {
+		throw new HttpError("No route found", 404);
+	}
+
+	const distanceKm = convertDistanceTextToKm(distanceText);
+
+	return {
+		origin,
+		destination,
+		mode,
+		distanceKm,
+	};
+};
 
 const app = new Elysia()
-  .get("/", () => Bun.file("src/index.html"))
-  .get("/api/tables", () => {
-    const tables = db.query("SELECT name FROM sqlite_master WHERE type='table' AND name != 'sqlite_sequence'").all();
-    console.log("Tables:", tables);
-    return tables;
-  })
-  .get("/api/table/:name", ({ params }) => {
-    const { name } = params;
-    try {
-      const dataQuery = db.query(`SELECT * FROM ${name}`);
-      const data = dataQuery.all();
-      
-      const schemaQuery = db.query(`PRAGMA table_info(${name})`);
-      const schema = schemaQuery.all();
-      
-      console.log(`Table ${name}:`, { schema, data });
-      return { schema, data };
-    } catch (error: any) {
-      console.error("Error loading table:", error);
-      return { error: error.message || 'Table not found' };
-    }
-  })
-  .ws("/ws", {
-    message(ws, message) {
-      console.log("Received from client:", message);
-      
-      // Broadcast the message to all connected clients as client message
-      ws.publish("chat", JSON.stringify({
-        type: 'client',
-        message,
-        timestamp: new Date().toISOString()
-      }));
-    },
-    open(ws) {
-      console.log("Client connected");
-      ws.subscribe("chat");
-      
-      // Send welcome message
-      ws.send(JSON.stringify({
-        type: 'system',
-        message: "Connected to WebSocket server",
-        timestamp: new Date().toISOString()
-      }));
-    },
-    close(ws) {
-      console.log("Client disconnected");
-      ws.unsubscribe("chat");
-    }
-  })
-  .listen(3000);
+	.onError(({ code, error, set }) => {
+		if (code === "VALIDATION") {
+			set.status = 400;
+			return { error: error.message };
+		}
 
-console.log(
-  `🦊 Elysia is running at ${app.server?.hostname}:${app.server?.port}`
-);
-console.log(`WebSocket endpoint: ws://${app.server?.hostname}:${app.server?.port}/ws`);
+		if (error instanceof HttpError) {
+			set.status = error.status;
+			return { error: error.message };
+		}
+
+		set.status = 500;
+		return { error: error instanceof Error ? error.message : "Unknown error" };
+	})
+	.get(
+		"/distance",
+		async ({ query, set }) => {
+			try {
+				const mode = (query.mode ?? "driving").toLowerCase() as TravelMode;
+				if (!travelModes.includes(mode)) {
+					set.status = 400;
+					return { error: `mode must be one of: ${travelModes.join(", ")}` };
+				}
+
+				return await fetchDistanceInKm(query.origin, query.destination, mode);
+			} catch (err) {
+				if (err instanceof HttpError) {
+					set.status = err.status;
+					return { error: err.message };
+				}
+
+				const message = err instanceof Error ? err.message : "Unknown error";
+				set.status = 502;
+				return { error: message };
+			}
+		},
+		{
+			query: t.Object({
+				origin: t.String({ minLength: 1 }),
+				destination: t.String({ minLength: 1 }),
+				mode: t.Optional(
+					t.String({ pattern: "^(driving|walking|bicycling|transit)$" }),
+				),
+			}),
+		},
+	)
+	.listen(Bun.env.PORT ?? process.env.PORT ?? 3000);
+
+const { hostname, port } = app.server ?? { hostname: "localhost", port: 3000 };
+console.log(`Elysia server listening on http://${hostname}:${port}`);
