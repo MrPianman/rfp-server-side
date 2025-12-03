@@ -11,10 +11,11 @@ Serve live vehicle and personnel data from a local SQLite database through a Gra
 	```bash
 	bun install
 	```
-2. Copy the environment template and point the server at your SQLite file (defaults to the bundled `niggers67.db` if unset):
+2. Copy the environment template and point the server at your SQLite file (defaults to the bundled `niggers67.db` if unset). If you plan to hit the Google Directions API, also add `GOOGLE_MAPS_API_KEY`:
 	```bash
 	cp .env.example .env
 	# edit .env to set SQLITE_DB_PATH=/absolute/path/to/your.db
+	# and optionally GOOGLE_MAPS_API_KEY=your-api-key
 	```
 3. (Optional) Set `PORT` if you need something other than `3000`.
 
@@ -24,7 +25,7 @@ Start the dev server with hot reload:
 bun run dev
 ```
 
-Then issue GraphQL requests to `POST /graphql`:
+Then issue GraphQL requests to `POST /graphql` or just work directly in the browser UI served at `/`, which now lists the current `vehicle` and `People` tables and includes forms for adding new rows.
 
 ```bash
 curl -X POST http://localhost:3000/graphql \
@@ -64,6 +65,19 @@ mutation UpdateList($id: ID!, $payload: JSON!) {
 }
 ```
 
+Calculate Google Directions distance/time when an API key is configured:
+
+```graphql
+query RouteSample {
+	routeMetrics(origin: "NY 10005", destination: "Hoboken NJ", mode: WALKING) {
+		distanceKm
+		distanceText
+		durationSeconds
+		durationText
+	}
+}
+```
+
 ### GraphQL schema (excerpt)
 
 ```graphql
@@ -93,10 +107,28 @@ type Query {
 	vehicles(status: String): [Vehicle!]!
 	vehicle(id: ID!): Vehicle
 	people(status: String): [Person!]!
+	routeMetrics(origin: String!, destination: String!, mode: TravelMode): RouteMetrics!
 }
 
 type Mutation {
 	updateVehicleMarketList(id: ID!, marketList: JSON!): Vehicle
+}
+
+enum TravelMode {
+	DRIVING
+	WALKING
+	BICYCLING
+	TRANSIT
+}
+
+type RouteMetrics {
+	origin: String!
+	destination: String!
+	mode: TravelMode!
+	distanceText: String!
+	distanceKm: Float!
+	durationText: String!
+	durationSeconds: Float!
 }
 ```
 
