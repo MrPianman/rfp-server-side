@@ -25,7 +25,7 @@ Start the dev server with hot reload:
 bun run dev
 ```
 
-Then issue GraphQL requests to `POST /graphql` or just work directly in the browser UI served at `/`, which now lists the current `vehicle` and `People` tables and includes forms for adding new rows.
+Then issue GraphQL requests to `POST /graphql` or just work directly in the browser UI served at `/`, which now lists the current `vehicle` and `People` tables and includes forms for adding new rows. Use the “Build Market List” button (or visit `/market-list`) to open a dedicated builder that exports JSON directly back into the vehicle form.
 
 ```bash
 curl -X POST http://localhost:3000/graphql \

@@ -14,6 +14,7 @@ import {
 	parseOptionalJSON,
 	parseOptionalNumber,
 	renderDashboard,
+	renderMarketListBuilder,
 } from "./lib/dashboard";
 import { createGraphQLSchema } from "./lib/graphql";
 
@@ -71,6 +72,10 @@ const app = new Elysia()
 			set.status = 500;
 			return err instanceof Error ? err.message : "Unable to load dashboard";
 		}
+	})
+	.get("/market-list", ({ set }) => {
+		set.headers["content-type"] = "text/html; charset=utf-8";
+		return renderMarketListBuilder();
 	})
 	.post(
 		"/vehicles",
