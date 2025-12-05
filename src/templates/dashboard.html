@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1" />
+	<title>Fleet Dashboard</title>
+	<style>
+		body { font-family: Arial, sans-serif; background: #f7fafc; margin: 0; padding: 20px; color: #1a202c; }
+		h1 { margin-bottom: 10px; }
+		section { background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); margin-bottom: 24px; }
+		.forms { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+		form { display: grid; gap: 10px; }
+		label { font-size: 13px; font-weight: 600; }
+		input, textarea { padding: 10px; border: 1px solid #cbd5f5; border-radius: 6px; font-size: 14px; font-family: inherit; }
+		textarea { min-height: 60px; resize: vertical; }
+		button { padding: 12px; border: none; border-radius: 6px; background: #3182ce; color: #fff; font-weight: bold; cursor: pointer; }
+		button:hover { background: #2769a3; }
+		button.secondary { background: #718096; }
+		.marketlist-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+		table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 14px; }
+		th, td { border: 1px solid #e2e8f0; padding: 10px; text-align: left; }
+		th { background: #edf2f7; }
+		tr:nth-child(even) { background: #f9fbff; }
+		.empty { text-align: center; color: #718096; font-style: italic; }
+	</style>
+</head>
+<body>
+	<section class="forms">
+		<div>
+			<h1>Add Vehicle</h1>
+			<form method="post" action="/vehicles">
+				<label>Name<input name="name" required /></label>
+				<label>Status<input name="status" /></label>
+				<label>Plate<input name="plate" required /></label>
+				<label>Speed (km/h)<input name="speed" type="number" step="any" /></label>
+				<label>Latitude<input name="lat" type="number" step="any" /></label>
+				<label>Longitude<input name="long" type="number" step="any" /></label>
+				<label>Driver<input name="driver" /></label>
+				<label>Note<input name="note" /></label>
+				<label>Market List (JSON)<textarea name="marketList" id="marketListInput"></textarea></label>
+				<div class="marketlist-actions">
+					<button type="button" class="secondary" onclick="window.location.href='/market-list'">Build Market List</button>
+					<button type="submit">Save Vehicle</button>
+				</div>
+			</form>
+		</div>
+		<div>
+			<h1>Add Person</h1>
+			<form method="post" action="/people">
+				<label>Name<input name="name" required /></label>
+				<label>Phone<input name="phone" /></label>
+				<label>Status<input name="status" /></label>
+				<button type="submit">Save Person</button>
+			</form>
+		</div>
+	</section>
+	<section>
+		<h1>Vehicles</h1>
+		<table>
+			<thead>
+				<tr>{{VEHICLE_HEADERS}}</tr>
+			</thead>
+			<tbody>
+				{{VEHICLE_ROWS}}
+			</tbody>
+		</table>
+	</section>
+	<section>
+		<h1>People</h1>
+		<table>
+			<thead>
+				<tr>{{PEOPLE_HEADERS}}</tr>
+			</thead>
+			<tbody>
+				{{PEOPLE_ROWS}}
+			</tbody>
+		</table>
+	</section>
+	<script>
+		(() => {
+			const storageKey = 'generatedMarketList';
+			const stored = localStorage.getItem(storageKey);
+			if (stored) {
+				const textarea = document.getElementById('marketListInput');
+				if (textarea) {
+					textarea.value = stored;
+				}
+				localStorage.removeItem(storageKey);
+			}
+		})();
+	</script>
+</body>
+</html>
