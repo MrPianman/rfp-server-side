@@ -6,10 +6,10 @@ function satisfaction(Ti, Tei, Tli, Tri, alpha = 1.0, beta = 1.0) {
     if (denom <= 0) return 0;
     return Math.max(0, ((Tli - Ti) / denom) ** alpha);
   }
-  if (Ti >= Tei && Ti <= Tli) {
+  if (Ti <= Tli) {
     return 1;
   }
-  if (Ti > Tli && Ti <= Tri) {
+  if (Ti <= Tri) {
     const denom = Tri - Tli;
     if (denom <= 0) return 0;
     return Math.max(0, ((Tri - Ti) / denom) ** beta);
