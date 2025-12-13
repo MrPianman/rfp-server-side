@@ -9,7 +9,7 @@ def satisfaction(Ti: float, Tei: float, Tli: float, Tri: float, alpha: float = 1
 			return 0.0
 		return max(0.0, ((Tli - Ti) / denom) ** alpha)
 	if Tei <= Ti <= Tli:
-		# On time within preferred window.
+		# On time within preferred window.=
 		return 1.0
 	if Tli < Ti <= Tri:
 		# Late but within tolerance: decays toward zero at Tri.
