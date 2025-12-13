@@ -1,10 +1,13 @@
 // Refuel decision utilities.
 
+const refuelKey = (i, k) => `${i}::${k}`;
+
 function initRefuelMatrix(nodes, stations, defaultValue = 0) {
   const matrix = {};
+  const base = Number(defaultValue);
   for (const i of nodes) {
     for (const k of stations) {
-      matrix[`${i},${k}`] = Number(defaultValue);
+      matrix[refuelKey(i, k)] = base;
     }
   }
   return matrix;
@@ -12,7 +15,7 @@ function initRefuelMatrix(nodes, stations, defaultValue = 0) {
 
 function setRefuel(xMatrix, i, k, value) {
   if (value < 0) throw new Error("Refilled fuel x_{i,k} must be >= 0");
-  const key = `${i},${k}`;
+  const key = refuelKey(i, k);
   if (!(key in xMatrix)) throw new Error("(i, k) not in refuel matrix");
   xMatrix[key] = value;
 }
@@ -22,7 +25,11 @@ function isRefueling(fuelAmount) {
 }
 
 function totalRefuel(xMatrix) {
-  return Object.values(xMatrix).reduce((sum, v) => sum + Number(v), 0);
+  let sum = 0;
+  for (const value of Object.values(xMatrix)) {
+    sum += Number(value);
+  }
+  return sum;
 }
 
 module.exports = {

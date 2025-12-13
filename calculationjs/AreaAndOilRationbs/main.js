@@ -9,10 +9,9 @@ function specificFuelCostPerKm(p_a_beta, f_a, f_u, e_a_beta_D, e_T_prime, q_a_be
 
 function totalTransportCost(sectionLengths, specificCosts) {
   let total = 0;
-  for (const beta of Object.keys(sectionLengths)) {
-    if (!(beta in specificCosts)) throw new Error(`Missing specific cost for section ${beta}`);
-    const length = sectionLengths[beta];
+  for (const [beta, length] of Object.entries(sectionLengths)) {
     const costPerKm = specificCosts[beta];
+    if (costPerKm === undefined) throw new Error(`Missing specific cost for section ${beta}`);
     total += length * costPerKm;
   }
   return total;
