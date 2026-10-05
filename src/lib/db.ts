@@ -43,7 +43,7 @@ export type Person = {
 	status: string | null;
 };
 
-const defaultDbPath = fileURLToPath(new URL("../../niggers67.db", import.meta.url));
+const defaultDbPath = fileURLToPath(new URL("../../database.db", import.meta.url));
 const providedDbPath = Bun.env.SQLITE_DB_PATH ?? process.env.SQLITE_DB_PATH;
 const dbPath = providedDbPath ? resolve(providedDbPath) : defaultDbPath;
 
