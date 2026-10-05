@@ -11,7 +11,7 @@ Serve live vehicle and personnel data from a local SQLite database through a Gra
 	```bash
 	bun install
 	```
-2. Copy the environment template and point the server at your SQLite file (defaults to the bundled `niggers67.db` if unset). If you plan to hit the Google Directions API, also add `GOOGLE_MAPS_API_KEY`:
+2. Copy the environment template and point the server at your SQLite file (defaults to the bundled `database.db` if unset). If you plan to hit the Google Directions API, also add `GOOGLE_MAPS_API_KEY`:
 	```bash
 	cp .env.example .env
 	# edit .env to set SQLITE_DB_PATH=/absolute/path/to/your.db
